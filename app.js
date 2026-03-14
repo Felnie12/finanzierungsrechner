@@ -1,73 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
-  // Tabs
-  const tabButtons = document.querySelectorAll(".tab-button");
-  const tabPanels = document.querySelectorAll(".tab-panel");
-
-  tabButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const targetId = btn.dataset.tab;
-
-      tabButtons.forEach((b) => b.classList.remove("active"));
-      tabPanels.forEach((p) => p.classList.remove("active"));
-
-      btn.classList.add("active");
-      document.getElementById(targetId).classList.add("active");
-    });
-  });
-
-  // Neuer Listener für purchase-form
-  const purchaseForm = document.getElementById("purchase-form");
-  const purchaseSummaryEl = document.getElementById("purchase-summary");
-  const purchaseDetailsEl = document.getElementById("purchase-details");
-
-  purchaseForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    try {
-      const purchasePrice = Number(document.getElementById("purchase-price").value);
-      const purchaseCostsPercent = Number(document.getElementById("purchase-costs-percent").value);
-      const modernization = Number(document.getElementById("modernization").value);
-      const equity = Number(document.getElementById("ek-purchase").value);
-      const zinsProzent = Number(document.getElementById("zins-purchase").value);
-      const tilgungProzent = Number(document.getElementById("tilgung-purchase").value);
-      const fixedYears = Number(document.getElementById("zinsbindung-purchase").value);
-
-      const result = calculateFromPurchase({
-        purchasePrice,
-        purchaseCostsPercent,
-        modernization,
-        equity,
-        interestPa: zinsProzent / 100,
-        initialRepaymentPa: tilgungProzent / 100,
-        fixedYears
-      });
-
-      const d = result.derived;
-      const r = result.result;
-
-      purchaseSummaryEl.innerHTML = `
-        <p>Gesamtkosten (inkl. Nebenkosten & Modernisierung): <strong>${d.total_costs.toFixed(2)} €</strong></p>
-        <p>Darlehensbetrag: <strong>${d.loan_amount.toFixed(2)} €</strong></p>
-        <p>Monatliche Rate: <strong>${r.monthly_rate.toFixed(2)} €</strong></p>
-        <p>Restschuld nach Zinsbindung: <strong>${r.remaining_debt_at_fix_end.toFixed(2)} €</strong></p>
-      `;
-
-      if (r.schedule.length) {
-        const first = r.schedule[0];
-        const last = r.schedule[r.schedule.length - 1];
-        purchaseDetailsEl.innerHTML = `
-          <p>Erste Rate: ${first.rate.toFixed(2)} € (Zins ${first.interest.toFixed(2)} €, Tilgung ${first.principal.toFixed(2)} €)</p>
-          <p>Letzter Monat im Plan: ${last.month}, Restschuld: ${last.remaining_debt.toFixed(2)} €</p>
-        `;
-      } else {
-        purchaseDetailsEl.textContent = "Kein Darlehen nötig (Eigenkapital deckt alle Kosten).";
-      }
-    } catch (err) {
-      purchaseSummaryEl.textContent = `Fehler: ${err.message}`;
-      purchaseDetailsEl.textContent = "";
-    }
-  });
-});
-
+// Hilfsfunktionen Einkommen/Kredit
 
 function maxMonthlyRate(netto, rateQuote = 0.35) {
   if (netto <= 0) throw new Error("Nettoeinkommen muss > 0 sein.");
@@ -80,6 +11,8 @@ function maxLoanFromIncome(netto, factor = 100) {
   if (factor <= 0) throw new Error("Faktor muss > 0 sein.");
   return netto * factor;
 }
+
+// Annuität + Tilgungsplan
 
 function annuityMonthlyRate(kredit, interestPa, years) {
   if (kredit <= 0) throw new Error("Kreditsumme muss > 0 sein.");
@@ -116,59 +49,7 @@ function amortizationSchedule(kredit, interestPa, years) {
   return schedule;
 }
 
-function calculateFromPurchase({
-  purchasePrice,
-  purchaseCostsPercent,
-  modernization,
-  equity,
-  interestPa,
-  initialRepaymentPa,
-  fixedYears
-}) {
-  if (purchasePrice <= 0) throw new Error("Kaufpreis muss > 0 sein.");
-  if (purchaseCostsPercent < 0) throw new Error("Nebenkosten % dürfen nicht negativ sein.");
-  if (modernization < 0) throw new Error("Modernisierung darf nicht negativ sein.");
-  if (equity < 0) throw new Error("Eigenkapital darf nicht negativ sein.");
-  if (!(interestPa > 0 && interestPa < 1)) throw new Error("Zins als Dezimalzahl angeben, z.B. 0.04.");
-  if (!(initialRepaymentPa > 0 && initialRepaymentPa < 1)) throw new Error("Tilgung als Dezimalzahl, z.B. 0.02.");
-  if (fixedYears <= 0) throw new Error("Zinsbindung muss > 0 sein.");
-
-  const purchaseCosts = purchasePrice * (purchaseCostsPercent / 100);
-  const totalCosts = purchasePrice + purchaseCosts + modernization;
-
-  let loanAmount = totalCosts - equity;
-  if (loanAmount < 0) loanAmount = 0;
-
-  // Für Rate/Restschuld nutzen wir denselben Tilgungsverlauf wie beim ersten Rechner
-  const schedule = amortizationSchedule(loanAmount, interestPa, fixedYears);
-  const monthlyRate = schedule.length ? schedule[0].rate : 0;
-  const remainingDebtAtFixEnd = schedule.length
-    ? schedule[schedule.length - 1].remaining_debt
-    : loanAmount;
-
-  return {
-    input: {
-      purchase_price: purchasePrice,
-      purchase_costs_percent: purchaseCostsPercent,
-      modernization,
-      equity,
-      interest_rate_annual: interestPa,
-      initial_repayment_annual: initialRepaymentPa,
-      fixed_rate_years: fixedYears
-    },
-    derived: {
-      purchase_costs: purchaseCosts,
-      total_costs: totalCosts,
-      loan_amount: loanAmount
-    },
-    result: {
-      monthly_rate: monthlyRate,
-      remaining_debt_at_fix_end: remainingDebtAtFixEnd,
-      schedule
-    }
-  };
-}
-
+// Rechner 1: Budget aus Einkommen
 
 function calculateBudget({
   netto,
@@ -227,10 +108,80 @@ function calculateBudget({
   };
 }
 
+// Rechner 2: Rate aus Kaufpreis
 
+function calculateFromPurchase({
+  purchasePrice,
+  purchaseCostsPercent,
+  modernization,
+  equity,
+  interestPa,
+  initialRepaymentPa,
+  fixedYears
+}) {
+  if (purchasePrice <= 0) throw new Error("Kaufpreis muss > 0 sein.");
+  if (purchaseCostsPercent < 0) throw new Error("Nebenkosten % dürfen nicht negativ sein.");
+  if (modernization < 0) throw new Error("Modernisierung darf nicht negativ sein.");
+  if (equity < 0) throw new Error("Eigenkapital darf nicht negativ sein.");
+  if (!(interestPa > 0 && interestPa < 1)) throw new Error("Zins als Dezimalzahl angeben, z.B. 0.04.");
+  if (!(initialRepaymentPa > 0 && initialRepaymentPa < 1)) throw new Error("Tilgung als Dezimalzahl, z.B. 0.02.");
+  if (fixedYears <= 0) throw new Error("Zinsbindung muss > 0 sein.");
 
+  const purchaseCosts = purchasePrice * (purchaseCostsPercent / 100);
+  const totalCosts = purchasePrice + purchaseCosts + modernization;
+
+  let loanAmount = totalCosts - equity;
+  if (loanAmount < 0) loanAmount = 0;
+
+  const schedule = amortizationSchedule(loanAmount, interestPa, fixedYears);
+  const monthlyRate = schedule.length ? schedule[0].rate : 0;
+  const remainingDebtAtFixEnd = schedule.length
+    ? schedule[schedule.length - 1].remaining_debt
+    : loanAmount;
+
+  return {
+    input: {
+      purchase_price: purchasePrice,
+      purchase_costs_percent: purchaseCostsPercent,
+      modernization,
+      equity,
+      interest_rate_annual: interestPa,
+      initial_repayment_annual: initialRepaymentPa,
+      fixed_rate_years: fixedYears
+    },
+    derived: {
+      purchase_costs: purchaseCosts,
+      total_costs: totalCosts,
+      loan_amount: loanAmount
+    },
+    result: {
+      monthly_rate: monthlyRate,
+      remaining_debt_at_fix_end: remainingDebtAtFixEnd,
+      schedule
+    }
+  };
+}
+
+// DOM-Initialisierung: Tabs + beide Formulare
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Tabs
+  const tabButtons = document.querySelectorAll(".tab-button");
+  const tabPanels = document.querySelectorAll(".tab-panel");
+
+  tabButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const targetId = btn.dataset.tab;
+
+      tabButtons.forEach((b) => b.classList.remove("active"));
+      tabPanels.forEach((p) => p.classList.remove("active"));
+
+      btn.classList.add("active");
+      document.getElementById(targetId).classList.add("active");
+    });
+  });
+
+  // Rechner 1: Budget aus Einkommen
   const form = document.getElementById("calc-form");
   const summaryEl = document.getElementById("result-summary");
   const detailsEl = document.getElementById("result-details");
@@ -275,5 +226,56 @@ document.addEventListener("DOMContentLoaded", () => {
       detailsEl.textContent = "";
     }
   });
-});
 
+  // Rechner 2: Rate aus Kaufpreis
+  const purchaseForm = document.getElementById("purchase-form");
+  const purchaseSummaryEl = document.getElementById("purchase-summary");
+  const purchaseDetailsEl = document.getElementById("purchase-details");
+
+  purchaseForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    try {
+      const purchasePrice = Number(document.getElementById("purchase-price").value);
+      const purchaseCostsPercent = Number(document.getElementById("purchase-costs-percent").value);
+      const modernization = Number(document.getElementById("modernization").value);
+      const equity = Number(document.getElementById("ek-purchase").value);
+      const zinsProzent = Number(document.getElementById("zins-purchase").value);
+      const tilgungProzent = Number(document.getElementById("tilgung-purchase").value);
+      const fixedYears = Number(document.getElementById("zinsbindung-purchase").value);
+
+      const result = calculateFromPurchase({
+        purchasePrice,
+        purchaseCostsPercent,
+        modernization,
+        equity,
+        interestPa: zinsProzent / 100,
+        initialRepaymentPa: tilgungProzent / 100,
+        fixedYears
+      });
+
+      const d = result.derived;
+      const r = result.result;
+
+      purchaseSummaryEl.innerHTML = `
+        <p>Gesamtkosten (inkl. Nebenkosten & Modernisierung): <strong>${d.total_costs.toFixed(2)} €</strong></p>
+        <p>Darlehensbetrag: <strong>${d.loan_amount.toFixed(2)} €</strong></p>
+        <p>Monatliche Rate: <strong>${r.monthly_rate.toFixed(2)} €</strong></p>
+        <p>Restschuld nach Zinsbindung: <strong>${r.remaining_debt_at_fix_end.toFixed(2)} €</strong></p>
+      `;
+
+      if (r.schedule.length) {
+        const first = r.schedule[0];
+        const last = r.schedule[r.schedule.length - 1];
+        purchaseDetailsEl.innerHTML = `
+          <p>Erste Rate: ${first.rate.toFixed(2)} € (Zins ${first.interest.toFixed(2)} €, Tilgung ${first.principal.toFixed(2)} €)</p>
+          <p>Letzter Monat im Plan: ${last.month}, Restschuld: ${last.remaining_debt.toFixed(2)} €</p>
+        `;
+      } else {
+        purchaseDetailsEl.textContent = "Kein Darlehen nötig (Eigenkapital deckt alle Kosten).";
+      }
+    } catch (err) {
+      purchaseSummaryEl.textContent = `Fehler: ${err.message}`;
+      purchaseDetailsEl.textContent = "";
+    }
+  });
+});
