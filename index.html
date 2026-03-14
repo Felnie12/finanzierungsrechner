@@ -7,47 +7,79 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main>
-    <h1>Baufinanzierungsrechner</h1>
+<main>
+  <h1>Baufinanzierungsrechner</h1>
 
+  <!-- Tab-Navigation -->
+  <nav class="tabs">
+    <button class="tab-button active" data-tab="tab-income">Budget aus Einkommen</button>
+    <button class="tab-button" data-tab="tab-purchase">Rate aus Kaufpreis</button>
+  </nav>
+
+  <!-- Tab 1: dein bisheriger Rechner -->
+  <section id="tab-income" class="tab-panel active">
+    <h2>Budget aus Einkommen</h2>
+    <form id="calc-form">
+      <!-- dein bisheriges Formular -->
+      ...
+    </form>
     <section>
-      <h2>Eingaben</h2>
-      <form id="calc-form">
-        <label>
-          Haushaltsnettoeinkommen / Monat (€)
-          <input type="number" id="netto" required min="0" step="100" />
-        </label>
-
-        <label>
-          Eigenkapital (€)
-          <input type="number" id="ek" required min="0" step="1000" />
-        </label>
-
-        <label>
-          Sollzins p.a. (%)
-          <input type="number" id="zins" required min="0" step="0.1" />
-        </label>
-
-        <label>
-          Anfängliche Tilgung p.a. (%)
-          <input type="number" id="tilgung" required min="0" step="0.1" />
-        </label>
-
-        <label>
-          Zinsbindung (Jahre)
-          <input type="number" id="zinsbindung" required min="1" step="1" />
-        </label>
-
-        <button type="submit">Berechnen</button>
-      </form>
-    </section>
-
-    <section>
-      <h2>Ergebnis</h2>
+      <h3>Ergebnis</h3>
       <div id="result-summary"></div>
       <div id="result-details"></div>
     </section>
-  </main>
+  </section>
+
+  <!-- Tab 2: neuer Kaufpreis-/Ratenrechner -->
+  <section id="tab-purchase" class="tab-panel">
+    <h2>Rate aus Kaufpreis</h2>
+    <form id="purchase-form">
+      <label>
+        Kaufpreis der Immobilie (€)
+        <input type="number" id="purchase-price" required min="0" step="1000" />
+      </label>
+
+      <label>
+        Kaufnebenkosten (% vom Kaufpreis, z.B. 10)
+        <input type="number" id="purchase-costs-percent" value="10" required min="0" step="0.5" />
+      </label>
+
+      <label>
+        Modernisierungs-/Sanierungskosten (€)
+        <input type="number" id="modernization" value="0" required min="0" step="1000" />
+      </label>
+
+      <label>
+        Eigenkapital (€)
+        <input type="number" id="ek-purchase" required min="0" step="1000" />
+      </label>
+
+      <label>
+        Sollzins p.a. (%)
+        <input type="number" id="zins-purchase" required min="0" step="0.1" />
+      </label>
+
+      <label>
+        Anfängliche Tilgung p.a. (%)
+        <input type="number" id="tilgung-purchase" required min="0" step="0.1" />
+      </label>
+
+      <label>
+        Zinsbindung (Jahre)
+        <input type="number" id="zinsbindung-purchase" required min="1" step="1" />
+      </label>
+
+      <button type="submit">Berechnen</button>
+    </form>
+
+    <section>
+      <h3>Ergebnis</h3>
+      <div id="purchase-summary"></div>
+      <div id="purchase-details"></div>
+    </section>
+  </section>
+</main>
+
 
   <script src="app.js"></script>
 </body>
