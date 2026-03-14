@@ -47,11 +47,11 @@ function amortizationScheduleFixedRate(loanAmount, interestPa, years, monthlyRat
 }
 
 // Rechner 1: Budget aus Einkommen
+// -> nur maximale Rate, Kreditobergrenzen, Budget. Kein Tilgungsplan / Restschuld.
 function calculateBudget({
   netto,
   ek,
   zins,
-  zinsbindung,
   tilgung,
   rateQuote = 0.35,
   incomeFactor = 100
@@ -60,7 +60,6 @@ function calculateBudget({
   if (ek < 0) throw new Error("Eigenkapital darf nicht negativ sein.");
   if (!(zins > 0 && zins < 1)) throw new Error("Zins als Dezimalzahl, z.B. 0.04.");
   if (!(tilgung > 0 && tilgung < 1)) throw new Error("Tilgung als Dezimalzahl, z.B. 0.02.");
-  if (zinsbindung <= 0) throw new Error("Zinsbindung muss > 0 sein.");
 
   // 1) Obergrenze Rate nach Einkommensregel (z.B. 35 %)
   const maxRate = maxMonthlyRate(netto, rateQuote);
@@ -75,16 +74,7 @@ function calculateBudget({
   // 4) Empfohlene Kreditsumme = Minimum aus beiden Grenzen
   const recommendedLoan = Math.min(loanIncome, loanFromRate);
 
-  // 5) Tatsächliche Monatsrate auf Basis (zins + tilgung) dieser Kreditsumme
-  const monthlyRate = monthlyRateFromInterestAndRepayment(recommendedLoan, zins, tilgung);
-
-  // 6) Tilgungsverlauf nur über die Zinsbindung mit dieser festen Rate
-  const schedule = amortizationScheduleFixedRate(recommendedLoan, zins, zinsbindung, monthlyRate);
-  const remainingDebtAtFixEnd = schedule.length
-    ? schedule[schedule.length - 1].remaining_debt
-    : recommendedLoan;
-  const fixEndMonth = schedule.length ? schedule[schedule.length - 1].month : null;
-
+  // 5) Budget (ohne Nebenkosten)
   const purchaseBudget = recommendedLoan + ek;
 
   return {
@@ -92,7 +82,6 @@ function calculateBudget({
       net_income_monthly: netto,
       equity: ek,
       interest_rate_annual: zins,
-      fixed_rate_years: zinsbindung,
       initial_repayment_annual: tilgung,
       max_rate_share_of_income: rateQuote,
       income_factor_for_loan: incomeFactor
@@ -105,17 +94,12 @@ function calculateBudget({
     },
     budget: {
       purchase_budget_without_costs: purchaseBudget
-    },
-    projection: {
-      monthly_rate: monthlyRate,
-      remaining_debt_at_fix_end: remainingDebtAtFixEnd,
-      fix_end_month: fixEndMonth
-    },
-    schedule
+    }
   };
 }
 
 // Rechner 2: Rate aus Kaufpreis
+// -> Rate = K * (Zins + Tilgung) / 12, Restschuld nach Zinsbindung aus Tilgungsplan.
 function calculateFromPurchase({
   purchasePrice,
   purchaseCostsPercent,
@@ -189,7 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Rechner 1
+  // Rechner 1: Budget aus Einkommen
   const form = document.getElementById("calc-form");
   const summaryEl = document.getElementById("result-summary");
   const detailsEl = document.getElementById("result-details");
@@ -202,35 +186,27 @@ document.addEventListener("DOMContentLoaded", () => {
         const ek = Number(document.getElementById("ek").value);
         const zinsProzent = Number(document.getElementById("zins").value);
         const tilgungProzent = Number(document.getElementById("tilgung").value);
-        const zinsbindung = Number(document.getElementById("zinsbindung").value);
+        // zinsbindung wird hier nicht mehr benötigt
 
         const result = calculateBudget({
           netto,
           ek,
           zins: zinsProzent / 100,
-          tilgung: tilgungProzent / 100,
-          zinsbindung
+          tilgung: tilgungProzent / 100
         });
 
         const c = result.constraints;
         const b = result.budget;
-        const p = result.projection;
 
         summaryEl.innerHTML = `
-          <p>Maximale Monatsrate (Faustregel): <strong>${c.max_monthly_rate.toFixed(2)} €</strong></p>
-          <p>Empfohlene Kreditsumme: <strong>${c.recommended_max_loan.toFixed(2)} €</strong></p>
+          <p>Maximale Monatsrate (z.&nbsp;B. 35&nbsp;% vom Netto): <strong>${c.max_monthly_rate.toFixed(2)} €</strong></p>
+          <p>Max. Kreditsumme nach Einkommensregel: <strong>${c.max_loan_income_rule.toFixed(2)} €</strong></p>
+          <p>Max. Kreditsumme nach Zins/Tilgung-Regel: <strong>${c.max_loan_annuity_rule.toFixed(2)} €</strong></p>
+          <p>Empfohlene maximale Kreditsumme: <strong>${c.recommended_max_loan.toFixed(2)} €</strong></p>
           <p>Kaufbudget (ohne Nebenkosten): <strong>${b.purchase_budget_without_costs.toFixed(2)} €</strong></p>
-          <p>Tatsächliche Monatsrate (Zins + Tilgung): <strong>${p.monthly_rate.toFixed(2)} €</strong></p>
-          <p>Restschuld nach Zinsbindung: <strong>${p.remaining_debt_at_fix_end.toFixed(2)} €</strong></p>
         `;
 
-        const first = result.schedule[0];
-        const last = result.schedule[result.schedule.length - 1];
-
-        detailsEl.innerHTML = `
-          <p>Erste Rate: ${first.rate.toFixed(2)} € (Zins ${first.interest.toFixed(2)} €, Tilgung ${first.principal.toFixed(2)} €)</p>
-          <p>Letzter Monat im Plan: ${last.month}, Restschuld: ${last.remaining_debt.toFixed(2)} €</p>
-        `;
+        detailsEl.textContent = ""; // keine Restschuld / Plan mehr
       } catch (err) {
         summaryEl.textContent = `Fehler: ${err.message}`;
         detailsEl.textContent = "";
@@ -238,7 +214,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Rechner 2
+  // Rechner 2: Rate aus Kaufpreis
   const purchaseForm = document.getElementById("purchase-form");
   const purchaseSummaryEl = document.getElementById("purchase-summary");
   const purchaseDetailsEl = document.getElementById("purchase-details");
