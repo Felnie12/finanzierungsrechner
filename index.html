@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>Baufinanzierungsrechner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main>
+    <h1>Baufinanzierungsrechner</h1>
+
+    <section>
+      <h2>Eingaben</h2>
+      <form id="calc-form">
+        <label>
+          Haushaltsnettoeinkommen / Monat (€)
+          <input type="number" id="netto" required min="0" step="100" />
+        </label>
+
+        <label>
+          Eigenkapital (€)
+          <input type="number" id="ek" required min="0" step="1000" />
+        </label>
+
+        <label>
+          Sollzins p.a. (%)
+          <input type="number" id="zins" required min="0" step="0.1" />
+        </label>
+
+        <label>
+          Anfängliche Tilgung p.a. (%)
+          <input type="number" id="tilgung" required min="0" step="0.1" />
+        </label>
+
+        <label>
+          Zinsbindung (Jahre)
+          <input type="number" id="zinsbindung" required min="1" step="1" />
+        </label>
+
+        <button type="submit">Berechnen</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Ergebnis</h2>
+      <div id="result-summary"></div>
+      <div id="result-details"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
