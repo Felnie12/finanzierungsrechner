@@ -12,45 +12,41 @@ function maxLoanFromIncome(netto, factor = 100) {
   return netto * factor;
 }
 
-// Annuität + Tilgungsplan
-
-function annuityMonthlyRate(kredit, interestPa, years) {
-  if (kredit <= 0) throw new Error("Kreditsumme muss > 0 sein.");
-  if (interestPa <= 0) throw new Error("Zins muss > 0 sein.");
-  if (years <= 0) throw new Error("Laufzeit muss > 0 sein.");
-
-  const i = interestPa / 12;
-  const n = Math.round(years * 12);
-  const factor = Math.pow(1 + i, n);
-  return kredit * (i * factor) / (factor - 1);
+// Monatsrate aus Zins + anfänglicher Tilgung
+// Jahres-Annuität = K * (zins + tilgung) -> Monatsrate = ... / 12
+function monthlyRateFromInterestAndRepayment(loanAmount, interestPa, repaymentPa) {
+  if (loanAmount < 0) throw new Error("Darlehensbetrag darf nicht negativ sein.");
+  if (!(interestPa > 0 && interestPa < 1)) throw new Error("Zins als Dezimalzahl, z.B. 0.04.");
+  if (!(repaymentPa > 0 && repaymentPa < 1)) throw new Error("Tilgung als Dezimalzahl, z.B. 0.02.");
+  return loanAmount * (interestPa + repaymentPa) / 12;
 }
 
-function amortizationSchedule(kredit, interestPa, years) {
+// Tilgungsplan mit fester Rate über die Zinsbindung
+function amortizationScheduleFixedRate(loanAmount, interestPa, years, monthlyRate) {
   const i = interestPa / 12;
   const n = Math.round(years * 12);
-  const rate = annuityMonthlyRate(kredit, interestPa, years);
   const schedule = [];
-  let rest = kredit;
+  let rest = loanAmount;
 
   for (let m = 1; m <= n; m++) {
-    const zins = rest * i;
-    const tilgung = rate - zins;
-    rest = rest - tilgung;
+    const interest = rest * i;
+    const principal = monthlyRate - interest;
+    rest = rest - principal;
     if (rest < 0) rest = 0;
     schedule.push({
       month: m,
-      rate,
-      interest: zins,
-      principal: tilgung,
+      rate: monthlyRate,
+      interest,
+      principal,
       remaining_debt: rest
     });
-    if (rest <= 0) break;
+    if (rest <= 0) break; // vorzeitig schuldenfrei
   }
+
   return schedule;
 }
 
 // Rechner 1: Budget aus Einkommen
-
 function calculateBudget({
   netto,
   ek,
@@ -66,20 +62,30 @@ function calculateBudget({
   if (!(tilgung > 0 && tilgung < 1)) throw new Error("Tilgung als Dezimalzahl, z.B. 0.02.");
   if (zinsbindung <= 0) throw new Error("Zinsbindung muss > 0 sein.");
 
+  // 1) Obergrenze Rate nach Einkommensregel (z.B. 35 %)
   const maxRate = maxMonthlyRate(netto, rateQuote);
+
+  // 2) Obergrenze Kredit aus Einkommens-Faustregel
   const loanIncome = maxLoanFromIncome(netto, incomeFactor);
 
+  // 3) Obergrenze Kredit aus maximal tragbarer Rate & Annuität (zins + tilgung)
   const annuityFactor = zins + tilgung;
   const loanFromRate = maxRate * 12 / annuityFactor;
 
+  // 4) Empfohlene Kreditsumme = Minimum aus beiden Grenzen
   const recommendedLoan = Math.min(loanIncome, loanFromRate);
-  const purchaseBudget = recommendedLoan + ek;
 
-  const schedule = amortizationSchedule(recommendedLoan, zins, zinsbindung);
+  // 5) Tatsächliche Monatsrate auf Basis (zins + tilgung) dieser Kreditsumme
+  const monthlyRate = monthlyRateFromInterestAndRepayment(recommendedLoan, zins, tilgung);
+
+  // 6) Tilgungsverlauf nur über die Zinsbindung mit dieser festen Rate
+  const schedule = amortizationScheduleFixedRate(recommendedLoan, zins, zinsbindung, monthlyRate);
   const remainingDebtAtFixEnd = schedule.length
     ? schedule[schedule.length - 1].remaining_debt
     : recommendedLoan;
   const fixEndMonth = schedule.length ? schedule[schedule.length - 1].month : null;
+
+  const purchaseBudget = recommendedLoan + ek;
 
   return {
     input: {
@@ -101,6 +107,7 @@ function calculateBudget({
       purchase_budget_without_costs: purchaseBudget
     },
     projection: {
+      monthly_rate: monthlyRate,
       remaining_debt_at_fix_end: remainingDebtAtFixEnd,
       fix_end_month: fixEndMonth
     },
@@ -109,7 +116,6 @@ function calculateBudget({
 }
 
 // Rechner 2: Rate aus Kaufpreis
-
 function calculateFromPurchase({
   purchasePrice,
   purchaseCostsPercent,
@@ -133,8 +139,11 @@ function calculateFromPurchase({
   let loanAmount = totalCosts - equity;
   if (loanAmount < 0) loanAmount = 0;
 
-  const schedule = amortizationSchedule(loanAmount, interestPa, fixedYears);
-  const monthlyRate = schedule.length ? schedule[0].rate : 0;
+  // Rate aus Annuität (zins + anfängliche Tilgung)
+  const monthlyRate = monthlyRateFromInterestAndRepayment(loanAmount, interestPa, initialRepaymentPa);
+
+  // Tilgung nur über die Zinsbindung mit dieser Rate
+  const schedule = amortizationScheduleFixedRate(loanAmount, interestPa, fixedYears, monthlyRate);
   const remainingDebtAtFixEnd = schedule.length
     ? schedule[schedule.length - 1].remaining_debt
     : loanAmount;
@@ -163,7 +172,6 @@ function calculateFromPurchase({
 }
 
 // DOM-Initialisierung: Tabs + beide Formulare
-
 document.addEventListener("DOMContentLoaded", () => {
   // Tabs
   const tabButtons = document.querySelectorAll(".tab-button");
@@ -181,7 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Rechner 1: Budget aus Einkommen
+  // Rechner 1
   const form = document.getElementById("calc-form");
   const summaryEl = document.getElementById("result-summary");
   const detailsEl = document.getElementById("result-details");
@@ -209,9 +217,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const p = result.projection;
 
         summaryEl.innerHTML = `
-          <p>Maximale Monatsrate: <strong>${c.max_monthly_rate.toFixed(2)} €</strong></p>
+          <p>Maximale Monatsrate (Faustregel): <strong>${c.max_monthly_rate.toFixed(2)} €</strong></p>
           <p>Empfohlene Kreditsumme: <strong>${c.recommended_max_loan.toFixed(2)} €</strong></p>
           <p>Kaufbudget (ohne Nebenkosten): <strong>${b.purchase_budget_without_costs.toFixed(2)} €</strong></p>
+          <p>Tatsächliche Monatsrate (Zins + Tilgung): <strong>${p.monthly_rate.toFixed(2)} €</strong></p>
           <p>Restschuld nach Zinsbindung: <strong>${p.remaining_debt_at_fix_end.toFixed(2)} €</strong></p>
         `;
 
@@ -229,7 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Rechner 2: Rate aus Kaufpreis
+  // Rechner 2
   const purchaseForm = document.getElementById("purchase-form");
   const purchaseSummaryEl = document.getElementById("purchase-summary");
   const purchaseDetailsEl = document.getElementById("purchase-details");
@@ -262,7 +271,7 @@ document.addEventListener("DOMContentLoaded", () => {
         purchaseSummaryEl.innerHTML = `
           <p>Gesamtkosten (inkl. Nebenkosten & Modernisierung): <strong>${d.total_costs.toFixed(2)} €</strong></p>
           <p>Darlehensbetrag: <strong>${d.loan_amount.toFixed(2)} €</strong></p>
-          <p>Monatliche Rate: <strong>${r.monthly_rate.toFixed(2)} €</strong></p>
+          <p>Monatliche Rate (Zins + Tilgung): <strong>${r.monthly_rate.toFixed(2)} €</strong></p>
           <p>Restschuld nach Zinsbindung: <strong>${r.remaining_debt_at_fix_end.toFixed(2)} €</strong></p>
         `;
 
