@@ -186,96 +186,100 @@ document.addEventListener("DOMContentLoaded", () => {
   const summaryEl = document.getElementById("result-summary");
   const detailsEl = document.getElementById("result-details");
 
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    try {
-      const netto = Number(document.getElementById("netto").value);
-      const ek = Number(document.getElementById("ek").value);
-      const zinsProzent = Number(document.getElementById("zins").value);
-      const tilgungProzent = Number(document.getElementById("tilgung").value);
-      const zinsbindung = Number(document.getElementById("zinsbindung").value);
+  if (form && summaryEl && detailsEl) {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      try {
+        const netto = Number(document.getElementById("netto").value);
+        const ek = Number(document.getElementById("ek").value);
+        const zinsProzent = Number(document.getElementById("zins").value);
+        const tilgungProzent = Number(document.getElementById("tilgung").value);
+        const zinsbindung = Number(document.getElementById("zinsbindung").value);
 
-      const result = calculateBudget({
-        netto,
-        ek,
-        zins: zinsProzent / 100,
-        tilgung: tilgungProzent / 100,
-        zinsbindung
-      });
+        const result = calculateBudget({
+          netto,
+          ek,
+          zins: zinsProzent / 100,
+          tilgung: tilgungProzent / 100,
+          zinsbindung
+        });
 
-      const c = result.constraints;
-      const b = result.budget;
-      const p = result.projection;
+        const c = result.constraints;
+        const b = result.budget;
+        const p = result.projection;
 
-      summaryEl.innerHTML = `
-        <p>Maximale Monatsrate: <strong>${c.max_monthly_rate.toFixed(2)} €</strong></p>
-        <p>Empfohlene Kreditsumme: <strong>${c.recommended_max_loan.toFixed(2)} €</strong></p>
-        <p>Kaufbudget (ohne Nebenkosten): <strong>${b.purchase_budget_without_costs.toFixed(2)} €</strong></p>
-        <p>Restschuld nach Zinsbindung: <strong>${p.remaining_debt_at_fix_end.toFixed(2)} €</strong></p>
-      `;
+        summaryEl.innerHTML = `
+          <p>Maximale Monatsrate: <strong>${c.max_monthly_rate.toFixed(2)} €</strong></p>
+          <p>Empfohlene Kreditsumme: <strong>${c.recommended_max_loan.toFixed(2)} €</strong></p>
+          <p>Kaufbudget (ohne Nebenkosten): <strong>${b.purchase_budget_without_costs.toFixed(2)} €</strong></p>
+          <p>Restschuld nach Zinsbindung: <strong>${p.remaining_debt_at_fix_end.toFixed(2)} €</strong></p>
+        `;
 
-      const first = result.schedule[0];
-      const last = result.schedule[result.schedule.length - 1];
+        const first = result.schedule[0];
+        const last = result.schedule[result.schedule.length - 1];
 
-      detailsEl.innerHTML = `
-        <p>Erste Rate: ${first.rate.toFixed(2)} € (Zins ${first.interest.toFixed(2)} €, Tilgung ${first.principal.toFixed(2)} €)</p>
-        <p>Letzter Monat im Plan: ${last.month}, Restschuld: ${last.remaining_debt.toFixed(2)} €</p>
-      `;
-    } catch (err) {
-      summaryEl.textContent = `Fehler: ${err.message}`;
-      detailsEl.textContent = "";
-    }
-  });
+        detailsEl.innerHTML = `
+          <p>Erste Rate: ${first.rate.toFixed(2)} € (Zins ${first.interest.toFixed(2)} €, Tilgung ${first.principal.toFixed(2)} €)</p>
+          <p>Letzter Monat im Plan: ${last.month}, Restschuld: ${last.remaining_debt.toFixed(2)} €</p>
+        `;
+      } catch (err) {
+        summaryEl.textContent = `Fehler: ${err.message}`;
+        detailsEl.textContent = "";
+      }
+    });
+  }
 
   // Rechner 2: Rate aus Kaufpreis
   const purchaseForm = document.getElementById("purchase-form");
   const purchaseSummaryEl = document.getElementById("purchase-summary");
   const purchaseDetailsEl = document.getElementById("purchase-details");
 
-  purchaseForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    try {
-      const purchasePrice = Number(document.getElementById("purchase-price").value);
-      const purchaseCostsPercent = Number(document.getElementById("purchase-costs-percent").value);
-      const modernization = Number(document.getElementById("modernization").value);
-      const equity = Number(document.getElementById("ek-purchase").value);
-      const zinsProzent = Number(document.getElementById("zins-purchase").value);
-      const tilgungProzent = Number(document.getElementById("tilgung-purchase").value);
-      const fixedYears = Number(document.getElementById("zinsbindung-purchase").value);
+  if (purchaseForm && purchaseSummaryEl && purchaseDetailsEl) {
+    purchaseForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      try {
+        const purchasePrice = Number(document.getElementById("purchase-price").value);
+        const purchaseCostsPercent = Number(document.getElementById("purchase-costs-percent").value);
+        const modernization = Number(document.getElementById("modernization").value);
+        const equity = Number(document.getElementById("ek-purchase").value);
+        const zinsProzent = Number(document.getElementById("zins-purchase").value);
+        const tilgungProzent = Number(document.getElementById("tilgung-purchase").value);
+        const fixedYears = Number(document.getElementById("zinsbindung-purchase").value);
 
-      const result = calculateFromPurchase({
-        purchasePrice,
-        purchaseCostsPercent,
-        modernization,
-        equity,
-        interestPa: zinsProzent / 100,
-        initialRepaymentPa: tilgungProzent / 100,
-        fixedYears
-      });
+        const result = calculateFromPurchase({
+          purchasePrice,
+          purchaseCostsPercent,
+          modernization,
+          equity,
+          interestPa: zinsProzent / 100,
+          initialRepaymentPa: tilgungProzent / 100,
+          fixedYears
+        });
 
-      const d = result.derived;
-      const r = result.result;
+        const d = result.derived;
+        const r = result.result;
 
-      purchaseSummaryEl.innerHTML = `
-        <p>Gesamtkosten (inkl. Nebenkosten & Modernisierung): <strong>${d.total_costs.toFixed(2)} €</strong></p>
-        <p>Darlehensbetrag: <strong>${d.loan_amount.toFixed(2)} €</strong></p>
-        <p>Monatliche Rate: <strong>${r.monthly_rate.toFixed(2)} €</strong></p>
-        <p>Restschuld nach Zinsbindung: <strong>${r.remaining_debt_at_fix_end.toFixed(2)} €</strong></p>
-      `;
-
-      if (r.schedule.length) {
-        const first = r.schedule[0];
-        const last = r.schedule[r.schedule.length - 1];
-        purchaseDetailsEl.innerHTML = `
-          <p>Erste Rate: ${first.rate.toFixed(2)} € (Zins ${first.interest.toFixed(2)} €, Tilgung ${first.principal.toFixed(2)} €)</p>
-          <p>Letzter Monat im Plan: ${last.month}, Restschuld: ${last.remaining_debt.toFixed(2)} €</p>
+        purchaseSummaryEl.innerHTML = `
+          <p>Gesamtkosten (inkl. Nebenkosten & Modernisierung): <strong>${d.total_costs.toFixed(2)} €</strong></p>
+          <p>Darlehensbetrag: <strong>${d.loan_amount.toFixed(2)} €</strong></p>
+          <p>Monatliche Rate: <strong>${r.monthly_rate.toFixed(2)} €</strong></p>
+          <p>Restschuld nach Zinsbindung: <strong>${r.remaining_debt_at_fix_end.toFixed(2)} €</strong></p>
         `;
-      } else {
-        purchaseDetailsEl.textContent = "Kein Darlehen nötig (Eigenkapital deckt alle Kosten).";
+
+        if (r.schedule.length) {
+          const first = r.schedule[0];
+          const last = r.schedule[r.schedule.length - 1];
+          purchaseDetailsEl.innerHTML = `
+            <p>Erste Rate: ${first.rate.toFixed(2)} € (Zins ${first.interest.toFixed(2)} €, Tilgung ${first.principal.toFixed(2)} €)</p>
+            <p>Letzter Monat im Plan: ${last.month}, Restschuld: ${last.remaining_debt.toFixed(2)} €</p>
+          `;
+        } else {
+          purchaseDetailsEl.textContent = "Kein Darlehen nötig (Eigenkapital deckt alle Kosten).";
+        }
+      } catch (err) {
+        purchaseSummaryEl.textContent = `Fehler: ${err.message}`;
+        purchaseDetailsEl.textContent = "";
       }
-    } catch (err) {
-      purchaseSummaryEl.textContent = `Fehler: ${err.message}`;
-      purchaseDetailsEl.textContent = "";
-    }
-  });
+    });
+  }
 });
